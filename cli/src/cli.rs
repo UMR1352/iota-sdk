@@ -29,8 +29,8 @@ use crate::{
 
 const DEFAULT_LOG_LEVEL: &str = "debug";
 const DEFAULT_NODE_URL: &str = "http://localhost:8050";
-const DEFAULT_STRONGHOLD_SNAPSHOT_PATH: &str = "./stardust-cli-wallet.stronghold";
-const DEFAULT_WALLET_DATABASE_PATH: &str = "./stardust-cli-wallet-db";
+const DEFAULT_STRONGHOLD_SNAPSHOT_PATH: &str = "./secrets.stronghold";
+const DEFAULT_WALLET_DATABASE_PATH: &str = "./wallet-db";
 
 #[derive(Debug, Clone, Parser)]
 #[command(author, version, about, long_about = None, propagate_version = true)]
@@ -107,7 +107,7 @@ pub enum CliCommand {
     Init(InitParameters),
     /// Migrate a stronghold snapshot v2 to v3.
     MigrateStrongholdSnapshotV2ToV3 {
-        /// Path of the to be migrated stronghold file. "./stardust-cli-wallet.stronghold" if nothing provided.
+        /// Path of the to be migrated stronghold file. "./secrets.stronghold" if nothing provided.
         path: Option<String>,
     },
     /// Generate a random mnemonic.
