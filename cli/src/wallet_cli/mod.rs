@@ -10,6 +10,7 @@ use colored::Colorize;
 use eyre::Error;
 use iota_sdk::{
     client::{api::options::TransactionOptions, request_funds_from_faucet, secret::SecretManager},
+    crypto::signatures::ed25519::PublicKey,
     types::block::{
         address::{AccountAddress, Bech32Address, ToBech32Ext},
         mana::ManaAllotment,
@@ -25,9 +26,9 @@ use iota_sdk::{
     },
     utils::ConvertTo,
     wallet::{
-        types::OutputData, BeginStakingParams, ConsolidationParams, CreateDelegationParams, CreateNativeTokenParams,
-        MintNftParams, ModifyAccountBlockIssuerKey, OutputsToClaim, ReturnStrategy, SendManaParams,
-        SendNativeTokenParams, SendNftParams, SendParams, SyncOptions, Wallet, WalletError,
+        types::OutputData, AccountSyncOptions, BeginStakingParams, ConsolidationParams, CreateDelegationParams,
+        CreateNativeTokenParams, MintNftParams, ModifyAccountBlockIssuerKey, OutputsToClaim, ReturnStrategy,
+        SendManaParams, SendNativeTokenParams, SendNftParams, SendParams, SyncOptions, Wallet, WalletError,
     },
     U256,
 };
@@ -751,7 +752,17 @@ pub async fn create_native_token_command(
             .wait_for_transaction_acceptance(&transaction.transaction_id, None, None)
             .await?;
         // Sync wallet after the transaction got confirmed, so the account output is available
-        wallet.sync(None).await?;
+        wallet
+            .sync(Some(SyncOptions {
+                sync_native_token_foundries: true,
+                sync_implicit_accounts: true,
+                account: AccountSyncOptions {
+                    basic_outputs: true,
+                    ..Default::default()
+                },
+                ..Default::default()
+            }))
+            .await?;
     }
 
     let params = CreateNativeTokenParams {
@@ -942,10 +953,10 @@ pub async fn implicit_accounts_command(wallet: &Wallet) -> Result<(), Error> {
 
 // `add-block-issuer-key` command
 pub async fn add_block_issuer_key(wallet: &Wallet, account_id: AccountId, issuer_key: &str) -> Result<(), Error> {
-    let issuer_key: [u8; Ed25519PublicKeyHashBlockIssuerKey::LENGTH] = prefix_hex::decode(issuer_key)?;
+    let public_key = PublicKey::try_from_bytes(prefix_hex::decode(issuer_key)?)?;
     let params = ModifyAccountBlockIssuerKey {
         account_id,
-        keys_to_add: vec![Ed25519PublicKeyHashBlockIssuerKey::new(issuer_key).into()],
+        keys_to_add: vec![Ed25519PublicKeyHashBlockIssuerKey::from_public_key(public_key).into()],
         keys_to_remove: vec![],
     };
 
@@ -962,11 +973,11 @@ pub async fn add_block_issuer_key(wallet: &Wallet, account_id: AccountId, issuer
 
 // `remove-block-issuer-key` command
 pub async fn remove_block_issuer_key(wallet: &Wallet, account_id: AccountId, issuer_key: &str) -> Result<(), Error> {
-    let issuer_key: [u8; Ed25519PublicKeyHashBlockIssuerKey::LENGTH] = prefix_hex::decode(issuer_key)?;
+    let public_key = PublicKey::try_from_bytes(prefix_hex::decode(issuer_key)?)?;
     let params = ModifyAccountBlockIssuerKey {
         account_id,
         keys_to_add: vec![],
-        keys_to_remove: vec![Ed25519PublicKeyHashBlockIssuerKey::new(issuer_key).into()],
+        keys_to_remove: vec![Ed25519PublicKeyHashBlockIssuerKey::from_public_key(public_key).into()],
     };
 
     let transaction = wallet.modify_account_output_block_issuer_keys(params, None).await?;
@@ -1199,6 +1210,10 @@ pub async fn sync_command(wallet: &Wallet) -> Result<(), Error> {
         .sync(Some(SyncOptions {
             sync_native_token_foundries: true,
             sync_implicit_accounts: true,
+            account: AccountSyncOptions {
+                basic_outputs: true,
+                ..Default::default()
+            },
             ..Default::default()
         }))
         .await?;
